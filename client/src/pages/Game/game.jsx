@@ -60,7 +60,7 @@ export default function Game({color}){
       const nextHistory = [...history.slice(0,currentMove+1),nextSquares];
       setHistory(nextHistory)
       setCurrentMove(nextHistory.length-1)
-      setWinner(calculateWinner(nextSquares))
+      setWinner(checkWinner(player, nextSquares, place))
     })
 
     return () => socket.off('handle-play')
@@ -190,6 +190,61 @@ function Board({xIsNext,squares,placeStone,playerColor}) {
   );
 }
 
+function checkEarlyTermination(squares1D, place) {
+	var ld = Math.min(place % 19, 4)
+	var rd = Math.min(18 - ld, 4)
+	var ud = Math.min(Math.floor(place/19), 4)
+	var dd = Math.min(18 - ud, 4)
+	
+	var startIndex = Math.max(place - ld - ud * 19,0)
+	var endIndex = Math.min(place + rd + dd * 19,360)
+	console.log("startIndex:", startIndex, "endIndex:", endIndex)
+	var placeList = [] // a list of cells that needs to be checked
+	
+	for (let i = startIndex; i <= endIndex; i++){
+		if (i % 19 >= startIndex % 19 && i % 19 <= endIndex % 19){
+			placeList.push(i);
+		}
+	}
+	
+  const blackstone = "X";
+
+  // Count the number of potential winning moves before the move
+  var pwmBefore = 0;
+	
+	for (const pos in placeList){
+		let testSquare = JSON.parse(JSON.stringify(squares1D))
+		if (testSquare[pos] !== null) continue;
+		else{
+			testSquare[place] = null
+            testSquare[pos] = blackstone
+            console.log(testSquare)
+			if (calculateWinner(testSquare) === blackstone) pwmBefore++
+		}
+	}
+
+  // Count the number of potential winning moves after the move
+  var pwmAfter = 0;
+	
+	for (const pos in placeList){
+		let testSquare = JSON.parse(JSON.stringify(squares1D))
+		if (testSquare[pos] !== null) continue;
+		else{
+            testSquare[pos] = blackstone
+			if (calculateWinner(testSquare) === blackstone) pwmAfter++
+		}
+	}
+  
+  // If the move increased the number of potential winning moves by 2 or more, end the game
+  console.log("pwmBefore:",pwmBefore, "pwmAfter:",pwmAfter)
+  if (pwmAfter - pwmBefore >= 2) {
+    console.log("WINNER: ", "O")
+    return("O")
+  }else{
+    return null
+  }
+}
+
 function calculateWinner(squares) {
   const width = 19;
   const height = 19;
@@ -228,6 +283,15 @@ function calculateWinner(squares) {
   // No winning sequence found
   console.log("no winning sequence")
   return null;
+}
+
+function checkWinner(player, squares, place){
+  if (player === "X"){
+    let res = calculateWinner(squares, 19, 19)
+    if (res == null) return checkEarlyTermination(squares, place)
+  }else{
+    return calculateWinner(squares, 19, 19)
+  }
 }
 
 function GameEndModal({summaryGame, winner}) {
